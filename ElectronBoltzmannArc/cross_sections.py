@@ -1,15 +1,21 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 Mbarn = 1e-22
 
 def total_xsec(Ee):
 	return 1e1*Mbarn*np.ones_like(Ee)
 
-def transfer_matrix(E_grid):
-	Ee = E_grid.flatten()
-	E1,E2 = np.meshgrid(Ee,Ee)
-	A = np.zeros_like(E1)
-	A[E1 > E2] = 1.0/np.sum(1.*(E1 > E2))
+def transfer_matrix(vmag,E_grid,pvol_grid):
+	Ee,pvol = E_grid.flatten(),pvol_grid.flatten()
 
-	xsec_t = total_xsec(Ee)
-	return xsec_t[None,:]*A
+	E2,E1 = np.meshgrid(Ee,Ee,indexing='ij')
+	A = pvol[None,:]*total_xsec(E1)/(4.0*np.pi/3.0*vmag**3)*np.heaviside(E1-E2,0.5)
+
+	from sys import exit
+	print(np.sum(A,axis=0),np.sum(A,axis=1))
+	plt.imshow(A[:,25].reshape(50,100))
+	plt.show()
+	exit()
+
+	return A

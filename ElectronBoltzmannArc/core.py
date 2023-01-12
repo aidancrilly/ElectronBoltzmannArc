@@ -22,12 +22,12 @@ class EBA_solver:
 		self.vpara  = np.linspace(-self.vmax,self.vmax,2*self.Nv)
 		self.dv     = self.vpara[1]-self.vpara[0]
 		self.vperp  = self.dv*(np.arange(self.Nv)+0.5)
-		self.vol    = 4*np.pi*dv*((self.vperp+0.5*self.dv)**2-(self.vperp-0.5*self.dv)**2) 
 
 		self.vpara_grid,self.vperp_grid = np.meshgrid(self.vpara,self.vperp)
 		self.vmag_grid = np.sqrt(self.vpara_grid**2+self.vperp_grid**2)
 		self.vmag = self.vmag_grid.flatten()
 		self.E_grid = energy_from_vps(self.vpara_grid,self.vperp_grid)
+		self.vol    = 4*np.pi*self.dv*((self.vperp_grid+0.5*self.dv)**2-(self.vperp_grid-0.5*self.dv)**2) 
 		self.Nmatrix = self.vmag.size
 
 		self.fe = np.zeros_like(self.vpara_grid)
@@ -35,7 +35,7 @@ class EBA_solver:
 
 	def initialise_cross_sections(self,dt):
 		self.total_rate      = self.n_neutral*self.vmag*total_xsec(self.E_grid).flatten()
-		self.transfer_matrix = self.n_neutral*self.vmag*transfer_matrix(self.E_grid)
+		self.transfer_matrix = self.n_neutral*self.vmag*transfer_matrix(self.vmag,self.E_grid,self.vol)
 
 		self.M = np.eye(self.Nmatrix)-dt*(self.transfer_matrix+np.diag(-self.total_rate))
 		self.lu, self.piv = lu_factor(self.M)
