@@ -1,6 +1,5 @@
 import numpy as np
-# from ElectronBoltzmannArc.constants import *
-from constants import *
+from ElectronBoltzmannArc.constants import *
 
 def energy_from_vps(v1,v2):
 	return 0.5*me*(v1**2+v2**2)/qe
