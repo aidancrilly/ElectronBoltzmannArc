@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from ElectronBoltzmannArc.constants import *
 
 Mbarn = 1e-22
 
@@ -10,12 +11,6 @@ def transfer_matrix(vmag,E_grid,pvol_grid):
 	Ee,pvol = E_grid.flatten(),pvol_grid.flatten()
 
 	E2,E1 = np.meshgrid(Ee,Ee,indexing='ij')
-	A = pvol[None,:]*total_xsec(E1)/(4.0*np.pi/3.0*vmag**3)*np.heaviside(E1-E2,0.5)
-
-	from sys import exit
-	print(np.sum(A,axis=0),np.sum(A,axis=1))
-	plt.imshow(A[:,25].reshape(50,100))
-	plt.show()
-	exit()
+	A = total_xsec(E1)/(4.0*np.pi/3.0*vmag**3)*np.heaviside(E1-E2,0.5)
 
 	return A

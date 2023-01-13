@@ -27,40 +27,43 @@ class EBA_solver:
 		self.vmag_grid = np.sqrt(self.vpara_grid**2+self.vperp_grid**2)
 		self.vmag = self.vmag_grid.flatten()
 		self.E_grid = energy_from_vps(self.vpara_grid,self.vperp_grid)
-		self.vol    = 4*np.pi*self.dv*((self.vperp_grid+0.5*self.dv)**2-(self.vperp_grid-0.5*self.dv)**2) 
+		self.vol    = np.pi*self.dv*((self.vperp_grid+0.5*self.dv)**2-(self.vperp_grid-0.5*self.dv)**2) 
 		self.Nmatrix = self.vmag.size
 
 		self.fe = np.zeros_like(self.vpara_grid)
 		self.t  = 0.0
 
-	def initialise_cross_sections(self,dt):
+	def initialise_cross_sections(self):
 		self.total_rate      = self.n_neutral*self.vmag*total_xsec(self.E_grid).flatten()
-		self.transfer_matrix = self.n_neutral*self.vmag*transfer_matrix(self.vmag,self.E_grid,self.vol)
+		self.transfer_matrix = self.n_neutral*self.vmag*transfer_matrix(self.vmag,self.E_grid,self.vol)*self.vol.flatten()[None,:]
 
-		self.M = np.eye(self.Nmatrix)-dt*(self.transfer_matrix+np.diag(-self.total_rate))
+		if(self.dt*np.amax(self.total_rate) > 1.0):
+			self.dt = 1/np.amax(self.total_rate)
+
+		self.M = np.eye(self.Nmatrix)-self.dt*(self.transfer_matrix+np.diag(-self.total_rate))
 		self.lu, self.piv = lu_factor(self.M)
 
 	def evolve(self,tmax,external_source,safety_factor=0.1):
 
-		dt = safety_factor*self.dv/(qe*self.E_applied/me)
-		Nt = int(np.ceil(tmax/dt))
+		self.dt = safety_factor*self.dv/(qe*self.E_applied/me)
+		self.initialise_cross_sections()
 
-		self.initialise_cross_sections(dt)
+		Nt = int(np.ceil(tmax/self.dt))
 
 		for it in range(Nt):
 			fe_old = np.copy(self.fe)
 
 			# Velocity advection by E, upwind
-			self.fe[:,:-1] = fe_old[:,:-1]+dt/self.dv*qe*self.E_applied/me*(fe_old[:,1:]-fe_old[:,:-1])
-			self.fe[:,-1]  = fe_old[:,-1]+dt/self.dv*qe*self.E_applied/me*(-fe_old[:,-1])
+			self.fe[:,:-1] = fe_old[:,:-1]+self.dt/self.dv*qe*self.E_applied/me*(fe_old[:,1:]-fe_old[:,:-1])
+			self.fe[:,-1]  = fe_old[:,-1]+self.dt/self.dv*qe*self.E_applied/me*(-fe_old[:,-1])
 
 			# Collision operators + external source, implicit
-			S = dt*self.n_neutral*0.5*(external_source(self.vpara_grid,self.vperp_grid,self.t)+external_source(self.vpara_grid,self.vperp_grid,self.t+dt))
+			S = self.dt*self.n_neutral*0.5*(external_source(self.vpara_grid,self.vperp_grid,self.t)+external_source(self.vpara_grid,self.vperp_grid,self.t+self.dt))
 			fe_intermediate = self.fe+S
 			sol = lu_solve((self.lu, self.piv),fe_intermediate.flatten())
 			self.fe = sol.reshape(self.Nv,2*self.Nv)
 
-			self.t = self.t + dt
+			self.t = self.t + self.dt
 
 		self.ne,self.Ve,self.Te = self.df_moments()
 
