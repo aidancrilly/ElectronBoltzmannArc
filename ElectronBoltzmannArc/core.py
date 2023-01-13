@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.linalg import lu_solve,lu_factor
+import matplotlib.pyplot as plt
+import ElectronBoltzmannArc.cross_sections as xs
 from ElectronBoltzmannArc.constants import *
-from ElectronBoltzmannArc.cross_sections import *
 from ElectronBoltzmannArc.utils import *
 
 def test_source(vpara_grid,vperp_grid,t,t0=8e-9,FWHM=10e-9,T=10.0):
@@ -10,7 +11,7 @@ def test_source(vpara_grid,vperp_grid,t,t0=8e-9,FWHM=10e-9,T=10.0):
 	return Maxwellian(E_grid,T)*R
 
 class EBA_solver:
-	def __init__(self,E_applied,n_neutral,vmax,Nv):
+	def __init__(self,E_applied,n_neutral,vmax,Nv,neutral_species='He'):
 		# Physical parameters
 		self.E_applied = E_applied # V/m
 		self.n_neutral = n_neutral # 1/m^3
@@ -33,9 +34,13 @@ class EBA_solver:
 		self.fe = np.zeros_like(self.vpara_grid)
 		self.t  = 0.0
 
+		if(neutral_species=='He'):
+			xs.Lotz_a,xs.Lotz_b,xs.Lotz_c,xs.Lotz_q,xs.Lotz_P = 4.0,0.75,0.46,[2.],[24.6]
+
 	def initialise_cross_sections(self):
-		self.total_rate      = self.n_neutral*self.vmag*total_xsec(self.E_grid).flatten()
-		self.transfer_matrix = self.n_neutral*self.vmag*transfer_matrix(self.vmag,self.E_grid,self.vol)*self.vol.flatten()[None,:]
+
+		self.total_rate      = self.n_neutral*self.vmag*xs.total_xsec(self.E_grid).flatten()
+		self.transfer_matrix = self.n_neutral*self.vmag*xs.transfer_matrix(self.vmag,self.E_grid,self.vol)*self.vol.flatten()[None,:]
 
 		if(self.dt*np.amax(self.total_rate) > 1.0):
 			self.dt = 1/np.amax(self.total_rate)
