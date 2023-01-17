@@ -47,7 +47,7 @@ def collisional_ionisation_transfer(vmag,E_grid,pvol_grid):
 		# Ionising electron
 		A = np.heaviside(E1-(E2+P),0.5)/(4*np.pi/3.0*vmag**3)
 		# Normalise
-		norm = np.sum(A*pvol[:,None])
+		norm = np.sum(A*pvol[None,:])
 		A = A/norm
 
 		U = E1/Lotz_P[0]
