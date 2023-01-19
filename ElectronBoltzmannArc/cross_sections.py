@@ -1,13 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from ElectronBoltzmannArc.constants import *
+from sys import exit
 
 # Lotz constants
 Lotz_a,Lotz_b,Lotz_c,Lotz_q,Lotz_P = None,None,None,None,None
 Lotz_a_unit = 1e-20 # m^2 (eV)^2
 
 def elastic_xsec(Ee):
-	sigma = np.zeros_like(Ee)
+	sigma = Lotz_collisional_ionisation_xsec(Ee)
 	return sigma
 
 def Lotz_collisional_ionisation_xsec(Ee):
@@ -23,53 +24,57 @@ def collisional_excitation_xsec(Ee):
 	sigma = np.zeros_like(Ee)
 	return sigma
 
-def total_xsec(Ee):
+def total_xsec(ve):
+	Ee = 0.5*me*ve**2/qe
 	sigma_tot = elastic_xsec(Ee)
-	sigma_tot += Lotz_collisional_ionisation_xsec(Ee)
+	# sigma_tot += Lotz_collisional_ionisation_xsec(Ee)
 	sigma_tot += collisional_excitation_xsec(Ee)
 	return sigma_tot
 
-def elastic_transfer(vmag,E_grid,pvol_grid):
-	Ee,pvol = E_grid.flatten(),pvol_grid.flatten()
-	E2,E1 = np.meshgrid(Ee,Ee,indexing='ij')
+def elastic_transfer(E1,E2):
+	t_matrix = np.zeros_like(E1)
 
-	total_T = np.zeros_like(E1)
+	t_matrix[E1 == E2] = elastic_xsec(E1[E1 == E2])
 
-	return total_T 
+	return t_matrix 
 
-def collisional_ionisation_transfer(vmag,E_grid,pvol_grid):
-	Ee,pvol = E_grid.flatten(),pvol_grid.flatten()
-	E2,E1 = np.meshgrid(Ee,Ee,indexing='ij')
-
-	total_T = np.zeros_like(E1)
+def collisional_ionisation_transfer(E1,E2):
+	t_matrix = np.zeros_like(E1)
 
 	for i,P in enumerate(Lotz_P):
-		# Ionising electron
-		A = np.heaviside(E1-(E2+P),0.5)/(4*np.pi/3.0*vmag**3)
-		# Normalise
-		norm = np.sum(A*pvol[None,:])
-		A = A/norm
+		sub_t = np.zeros_like(t_matrix)
+		# idx = np.argmin(np.abs(E1-(E2+P)))
+		# sub_t[idx,:] += 1.0
 
 		U = E1/Lotz_P[0]
 		x = E1/P
 		x[x < 1.0] = 1.0
-		total_T += 2*Lotz_a_unit*Lotz_a*(1-Lotz_b*np.exp(-Lotz_c*(U-1)))*Lotz_q[i]*np.log(x)/(E1*P)*A
+		sigma = Lotz_a_unit*Lotz_a*(1-Lotz_b*np.exp(-Lotz_c*(U-1)))*Lotz_q[i]*np.log(x)/(E1*P)
+		t_matrix += sigma*sub_t
 
-	return total_T 
+	return t_matrix 
 
-def collisional_excitation_transfer(vmag,E_grid,pvol_grid):
-	Ee,pvol = E_grid.flatten(),pvol_grid.flatten()
-	E2,E1 = np.meshgrid(Ee,Ee,indexing='ij')
+def collisional_excitation_transfer(E1,E2):
 
-	total_T = np.zeros_like(E1)
+	t_matrix = np.zeros_like(E1)
 
-	return total_T 
+	return t_matrix 
 
-def transfer_matrix(vmag,E_grid,pvol_grid):
+def transfer_matrix(ve,Vv,mu,mu_w):
 
-	t_matrix = elastic_transfer(vmag,E_grid,pvol_grid)
-	t_matrix += collisional_ionisation_transfer(vmag,E_grid,pvol_grid)
-	t_matrix += collisional_excitation_transfer(vmag,E_grid,pvol_grid)
+	Ee = 0.5*me*ve**2/qe
+	E1,E2 = np.meshgrid(Ee,Ee)
 
-	return t_matrix
+	t_matrix = np.zeros_like(E1)
+
+	t_matrix += elastic_transfer(E1,E2)
+	t_matrix += collisional_ionisation_transfer(E1,E2)
+	# t_matrix += collisional_excitation_transfer(E1,E2)
+	# t_matrix = t_matrix*Vv[None,:]
+
+	Nmu = mu.size
+	t_rows  = np.hstack([0.5*t_matrix*w for w in mu_w])
+	total_T = np.vstack((t_rows,)*Nmu)
+
+	return total_T
 
