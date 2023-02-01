@@ -9,10 +9,10 @@ from sys import exit
 def test_source(v,t,t0=8e-9,FWHM=10e-9,T=10.0):
 	Ke = 0.5*me*v**2/qe
 	R      = Gaussian_from_FWHM(t,t0,FWHM)
-	return Maxwellian(Ke,T)*R
+	return 1e-3*Maxwellian(Ke,T)*R
 
 class EBA_solver:
-	def __init__(self,E_applied,n_neutral,vmax,Nv,mu,mu_w,neutral_species='He'):
+	def __init__(self,E_applied,n_neutral,vmax,Nv,mu,mu_w,neutral_species):
 		# Physical parameters
 		self.E_applied = np.abs(E_applied) # V/m
 		self.n_neutral = n_neutral # 1/m^3
@@ -23,6 +23,7 @@ class EBA_solver:
 
 		self.dv	    = self.vmax/(self.Nv-1)
 		self.v_arr  = self.dv*(np.arange(self.Nv)+0.5)
+		self.E_arr  = 0.5*me*(self.v_arr)**2/qe
 		self.A_v    = 4*np.pi*self.dv**2*(np.arange(self.Nv+1))**2
 		self.V_v    = 4*np.pi/3.0*((self.v_arr+0.5*self.dv)**3-(self.v_arr-0.5*self.dv)**3)
 		self.v_edges= self.dv*(np.arange(self.Nv+1))
@@ -45,8 +46,7 @@ class EBA_solver:
 		self.fe = np.zeros_like(self.v_grid)
 		self.t  = 0.0
 
-		if(neutral_species=='He'):
-			xs.Lotz_a,xs.Lotz_b,xs.Lotz_c,xs.Lotz_q,xs.Lotz_P = 4.0,0.75,0.46,[2.],[24.6]
+		xs.neutral_species.set_material_type(neutral_species)
 
 		self.intialise_matrices()
 
@@ -136,10 +136,9 @@ class EBA_solver:
 
 		self.C = np.diag(self.total_rate)-self.transfer_matrix
 
-	def evolve(self,tmax,external_source,safety_factor=0.1):
+	def evolve(self,tmax,external_source,dt):
 
-		self.dt = safety_factor*self.dv/(qe*self.E_applied/me)
-		self.dt = 1e-10
+		self.dt = dt #safety_factor*self.dv*np.amin(np.abs(self.mu_arr))/(qe*self.E_applied/me)
 		Nt = int(np.ceil(tmax/self.dt))
 
 		self.A = self.M+self.D/self.dt
